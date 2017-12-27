@@ -15,10 +15,13 @@ const respond = {
             message: output.message
         };
         if (output.stack) log.error(resp);
-        res.status(status || 200).json(resp);
+        return res.status(status || 200).json(resp);
     },
     send200(res, message, type) {
-        res.json({ type, data: message || 'success' });
+        return res.json({ type, data: message || 'success' });
+    },
+    sendUnauthorized(res) {
+        return res.status(401).send('unauthorized');
     }
 };
 

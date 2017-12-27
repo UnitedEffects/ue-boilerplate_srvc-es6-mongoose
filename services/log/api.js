@@ -8,6 +8,7 @@ import logs from './logs';
 
 const api = {
     writeLog(req, res) {
+        console.info(req.body);
         if (!req.body.logCode) {
             return responder.send(res, response.fail405());
         }
