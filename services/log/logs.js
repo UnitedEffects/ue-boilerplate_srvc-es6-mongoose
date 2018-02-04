@@ -79,7 +79,8 @@ export default {
         const data = {
             logCode: 'ERROR',
             logTimestamp: moment().format(),
-            message
+            message: `Caught Error at ${moment().format('LLLL')}. See details.`,
+            details: message
         };
         const log = new Log(data);
         log.save()

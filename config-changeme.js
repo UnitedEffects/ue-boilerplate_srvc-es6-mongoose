@@ -9,6 +9,7 @@ const config = {
     REPLICA: process.env.REPLICA || 'rs0',
     UEAUTH: process.env.UEAUTH || 'https://domain.unitedeffects.com',
     WEBHOOK: process.env.WEBHOOK || 'YOURWEBHOOKVALUE',
+    PRODUCT_SLUG: process.env.PRODUCT_SLUG || 'your_product_slug'
 };
 
 module.exports = config;

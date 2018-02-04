@@ -10,6 +10,11 @@ const helper = {
         } catch (e) {
             return false;
         }
+    },
+    elementExists(property, check, arr) {
+        return arr.some(function(el) {
+            return el[property] === check;
+        });
     }
 };
 

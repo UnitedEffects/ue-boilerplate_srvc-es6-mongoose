@@ -22,6 +22,30 @@ const callbackFactory = {
             data: error
         };
     },
+    success204(message) {
+        return {
+            code: 204,
+            data: message || 'No Content'
+        }
+    },
+    success206(message) {
+        return {
+            code: 206,
+            data: message || 'Partial Content'
+        }
+    },
+    success201(message) {
+        return {
+            code: 201,
+            data: message || 'Created'
+        }
+    },
+    success202(message) {
+        return {
+            code: 202,
+            data: message || 'Accepted'
+        }
+    },
     fail400(message) {
         return {
             code: 400,

@@ -4,19 +4,28 @@
  */
 import passport from 'passport';
 import promisify from 'es6-promisify';
-//import {BasicStrategy} from 'passport-http';
-import {Strategy as BearerStrategy} from 'passport-http-bearer';
-import Token from './model';
-import moment from 'moment';
 import rq from 'request';
-import log from '../log/logs';
-
 const request = promisify(rq);
+import {Strategy as BearerStrategy} from 'passport-http-bearer';
+import moment from 'moment';
 
-//const request = Promiseb.promisify(rq);
-
+import Token from './model';
+import log from '../log/logs';
 import config from '../../config';
 import helper from '../helper';
+
+function findToken (tokens, val) {
+    return new Promise(async (resolve, reject) => {
+        let theToken = null;
+        await Promise.all(tokens.map(async (token) => {
+            await token.verifyToken(val, (err, isMatch) => {
+                if(err) return reject(err);
+                if(isMatch) theToken = token;
+            });
+        }));
+        return resolve(theToken);
+    })
+}
 
 passport.use('bearer', new BearerStrategy(
     (accessToken, callback) => {
@@ -32,7 +41,11 @@ passport.use('bearer', new BearerStrategy(
 
             if(!product) return callback(null, false);
             if(!domain) return callback(null, false);
-            Token.findOne({ user_id: userId, product_slug: product, domain_slug: domain })
+            Token.find({ user_id: userId, product_slug: product, domain_slug: domain })
+                .then((token)=>{
+                    if(token.length===0) return null;
+                    return findToken(token, tokenVal);
+                })
                 .then(token => {
                     if (!token) {
                         getBearerToken(accessToken, (err, result) => callback(err, result));
@@ -79,9 +92,10 @@ function getBearerToken(accessToken, callback){
             if (response.statusCode !== 200) return callback(null, false);
             const returned = (helper.isJson(response.body)) ? JSON.parse(response.body) : response.body;
             try {
+                if(returned.data.role !== 1 && returned.data.activity.product!==config.PRODUCT_SLUG) return callback(null, false);
                 authFactory.saveToken(returned.data, {product: lookup[2] || null, domain: lookup[3] || null}, lookup[1], err => {
-                    log.error('Unable to cache the token after validation.');
-                    callback(null, returned.data);
+                    if(err) log.error('Unable to cache the token after validation.');
+                    return callback(null, returned.data);
                 });
 
             } catch (err) {
@@ -106,7 +120,11 @@ passport.deserializeUser((user, done) => {
 const authFactory = {
     isBearerAuthenticated: passport.authenticate('bearer', { session: false }),
     saveToken(user, access, tokenVal, callback) {
-        Token.findOneAndRemove({user_id: user._id, product_slug: access.product, domain_slug: access.domain})
+        Token.find({user_id: user._id, product_slug: access.product, domain_slug: access.domain})
+            .then((toks) => {
+                if(toks.length>5) return Token.remove({_id: toks[0]._id});
+                return true;
+            })
             .then(() => {
                 const tCreated = user.token_created;
 
@@ -145,11 +163,25 @@ const authFactory = {
     validProductAdmin (user) {
         if(user.role === 1) return true;
         else if(user.activity) if (user.activity.product) if(user.permissions) if(user.permissions.product) if(user.permissions.product[user.activity.product]) {
+            if(user.permissions.product[user.activity.product].admin || user.permissions.product[user.activity.product].manager) return true;
+        }
+        return false;
+    },
+    validProductAdminOnly (user) {
+        if(user.role === 1) return true;
+        else if(user.activity) if (user.activity.product) if(user.permissions) if(user.permissions.product) if(user.permissions.product[user.activity.product]) {
             return user.permissions.product[user.activity.product].admin;
         }
         return false;
     },
     validDomainAdmin (user) {
+        if(user.role === 1) return true;
+        else if(user.activity) if (user.activity.domain) if(user.permissions) if(user.permissions.domain) if(user.permissions.domain[user.activity.domain]) {
+            if(user.permissions.domain[user.activity.domain].admin || user.permissions.domain[user.activity.domain].manager) return true;
+        }
+        return false;
+    },
+    validDomainAdminOnly (user) {
         if(user.role === 1) return true;
         else if(user.activity) if (user.activity.domain) if(user.permissions) if(user.permissions.domain) if(user.permissions.domain[user.activity.domain]) {
             return user.permissions.domain[user.activity.domain].admin;
@@ -162,20 +194,52 @@ const authFactory = {
         else if(this.validDomainAdmin(user)) return true;
         return false;
     },
-    thisValidProductAdmin (user, product) {
+    validAdminOnly (user) {
+        if(user.role === 1) return true;
+        else if(this.validProductAdminOnly(user)) return true;
+        else if(this.validDomainAdminOnly(user)) return true;
+        return false;
+    },
+    thisValidAdmin (user, product, domain) {
+        if(user.role === 1) return true;
+        else if(this.thisValidProductAdmin(user, product)) return true;
+        else if(this.thisValidDomainAdmin(user, domain)) return true;
+        return false;
+    },
+    thisValidAdminOnly (user, product, domain) {
+        if(user.role === 1) return true;
+        else if(this.thisValidProductAdminOnly(user, product)) return true;
+        else if(this.thisValidDomainAdminOnly(user, domain)) return true;
+        return false;
+    },
+    thisValidProductAdminOnly (user, product) {
         if(user.role === 1) return true;
         else if(user.permissions) if(user.permissions.product) if(user.permissions.product[product]) {
             return user.permissions.product[product].admin;
         }
         return false;
     },
+    thisValidProductAdmin (user, product) {
+        if(user.role === 1) return true;
+        else if(user.permissions) if(user.permissions.product) if(user.permissions.product[product]) {
+            if(user.permissions.product[product].admin || user.permissions.product[product].manager) return true;
+        }
+        return false;
+    },
     thisValidDomainAdmin (user, domain) {
+        if(user.role === 1) return true;
+        else if(user.permissions) if(user.permissions.domain) if(user.permissions.domain[domain]) {
+            if(user.permissions.domain[domain].admin || user.permissions.domain[domain].manager) return true;
+        }
+        return false;
+    },
+    thisValidDomainAdminOnly (user, domain) {
         if(user.role === 1) return true;
         else if(user.permissions) if(user.permissions.domain) if(user.permissions.domain[domain]) {
             return user.permissions.domain[domain].admin;
         }
         return false;
-    },
+    }
 };
 
 export default authFactory;

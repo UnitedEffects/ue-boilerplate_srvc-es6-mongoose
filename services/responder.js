@@ -14,7 +14,7 @@ const respond = {
             data: output.data || output.stack,
             message: output.message
         };
-        if (output.stack) log.error(resp);
+        if (output.stack) log.detail('ERROR', 'Error Sending Response', resp);
         return res.status(status || 200).json(resp);
     },
     send200(res, message, type) {
