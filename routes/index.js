@@ -5,7 +5,7 @@ const router = express.Router();
 const pJson = require('../package.json');
 /* GET index page. */
 router.get('/', (req, res) => {
-    let maintainer = 'bmotlagh@frontlineed.com';
+    let maintainer = 'bmotlagh@unitedeffects.com';
     if (pJson.contributors) maintainer = pJson.contributors[0].email;
     res.render('index', {
         maintainer
